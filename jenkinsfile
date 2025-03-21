@@ -1,32 +1,57 @@
 pipeline {
     agent any
 
-    tools {
-        // Install the Maven version configured as "M3" and add it to the path.
-        maven "M3"
-    }
+environment {
+    AZURE_SUBSCIPTION_ID = credentials('AZURE_SUBSCIPTION_ID')
+    AZURE_CLIENT_ID = credentials(' AZURE_CLIENT_ID')
+    AZURE_CLIENT_SECRET = credentials('AZURE_CLIENT_SECRET')
+    AZURE_TENET_ID = credentials('AZURE_TENET_ID')
+}
 
-    stages {
-        stage('Build') {
-            steps {
-                // Get some code from a GitHub repository
-                git 'https://github.com/jglick/simple-maven-project-with-tests.git'
-
-                // Run Maven on a Unix agent.
-                sh "mvn -Dmaven.test.failure.ignore=true clean package"
-
-                // To run Maven on a Windows agent, use
-                // bat "mvn -Dmaven.test.failure.ignore=true clean package"
-            }
-
-            post {
-                // If Maven was able to run the tests, even if some of the test
-                // failed, record the test results and archive the jar file.
-                success {
-                    junit '**/target/surefire-reports/TEST-*.xml'
-                    archiveArtifacts 'target/*.jar'
-                }
-            }
+stages{
+    stage('Checkout Code') {
+        steps {
+            git 'https://github.com/your-repo/terraform-azure.git'
         }
     }
+
+    stage('Azure Login') {
+        steps {
+            sh '''
+            az login --service-principal -u $AZURE_CLIENT_ID -p $ AZURE_CLIENT_SECRET --tenant $AZURE_TENET_ID
+            az account set --subscription $AZURE_SUBSCIPTION_ID
+            '''
+        }
+    }
+
+    stage('Terraform init') {
+        steps {
+            sh 'terrform init'
+        }
+    }
+
+    stage('Terraform plan') {
+        steps {
+            sh 'terrform plan -out=tfplan'
+        }
+    }
+
+    stage('Terraform Apply') {
+        steps {
+            sh 'terrform apply -auto-arppove tfplan'
+        }
+    }
+    }
+
+post {
+    always {
+        sh 'terraform state list'
+    }
+    success{
+        echo 'Terraform applied successfully'
+    }
+    failure {
+        echo 'Terraform deplyment failed'
+    }
+}
 }
