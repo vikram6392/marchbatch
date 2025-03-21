@@ -13,17 +13,10 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                    withCredentials([azureServicePrincipal(credentialsId: 'azuresp', variable: 'azuresp')]) {
-                        // Set Azure credentials
-                        // sh 'az login --service-principal -u $MY_CRED_CLIENT_ID -p $MY_CRED_CLIENT_SECRET -t $MY_CRED_TENANT_ID'
-                        sh 'export ARM_CLIENT_ID=$MY_CRED_CLIENT_ID'
-                        sh 'export ARM_CLIENT_SECRET=$MY_CRED_CLIENT_SECRET'
-                        sh 'export ARM_SUBSCRIPTION_ID=$MY_CRED_SUBSCRIPTION_ID'
-                        sh 'export ARM_TENANT_ID=$MY_CRED_TENANT_ID'
-
-                        // Run Terraform apply
-                        sh 'terraform init'
-                        }
+                // Initialize Terraform
+                dir ( '/var/lib/jenkins/workspace/terraform/workshop' ){
+                script { 
+                    sh 'terraform init'
                     }
                 }
             }
@@ -32,7 +25,7 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 // Apply Terraform changes
-                dir ('/var/lib/jenkins/workspace/workshop'){
+                dir ('/var/lib/jenkins/workspace/terraform/workshop'){
                 script {
                     withCredentials([azureServicePrincipal(credentialsId: 'azuresp', variable: 'azuresp')]) {
                         // Set Azure credentials
@@ -53,7 +46,7 @@ pipeline {
 post {
         success {
             // Clean up, e.g., destroy resources (optional)
-            sh 'terraform destroy -auto-approve'
+            // sh 'terraform destroy -auto-approve'
         }
     }
 }
