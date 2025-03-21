@@ -1,57 +1,52 @@
 pipeline {
     agent any
+    environment {
+        MY_CRED = credentials('azuresp')
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                // Checkout your Git repository
+                git url: 'https://github.com/vikram6392/marchbatch.git'
+            }
+        }
 
-environment {
-    AZURE_SUBSCIPTION_ID = credentials('AZURE_SUBSCIPTION_ID')
-    AZURE_CLIENT_ID = credentials(' AZURE_CLIENT_ID')
-    AZURE_CLIENT_SECRET = credentials('AZURE_CLIENT_SECRET')
-    AZURE_TENET_ID = credentials('AZURE_TENET_ID')
-}
+        stage('Terraform Init') {
+            steps {
+                // Initialize Terraform
+                dir ( '/var/lib/jenkins/workspace/terraform/terraform' ){
+                script { 
+                    sh 'terraform init'
+                    }
+                }
+            }
+        }
 
-stages{
-    stage('Checkout Code') {
-        steps {
-            git 'https://github.com/your-repo/terraform-azure.git'
+        stage('Terraform Apply') {
+            steps {
+                // Apply Terraform changes
+                dir ('/var/lib/jenkins/workspace/terraform/terraform'){
+                script {
+                    withCredentials([azureServicePrincipal(credentialsId: 'azuresp', variable: 'azuresp')]) {
+                        // Set Azure credentials
+                        // sh 'az login --service-principal -u $MY_CRED_CLIENT_ID -p $MY_CRED_CLIENT_SECRET -t $MY_CRED_TENANT_ID'
+                        sh 'export ARM_CLIENT_ID=$MY_CRED_CLIENT_ID'
+                        sh 'export ARM_CLIENT_SECRET=$MY_CRED_CLIENT_SECRET'
+                        sh 'export ARM_SUBSCRIPTION_ID=$MY_CRED_SUBSCRIPTION_ID'
+                        sh 'export ARM_TENANT_ID=$MY_CRED_TENANT_ID'
+
+                        // Run Terraform apply
+                        sh 'sudo terraform apply -auto-approve'
+                        }
+                    }
+                }
+            }
         }
     }
-
-    stage('Azure Login') {
-        steps {
-            sh '''
-            az login --service-principal -u $AZURE_CLIENT_ID -p $ AZURE_CLIENT_SECRET --tenant $AZURE_TENET_ID
-            az account set --subscription $AZURE_SUBSCIPTION_ID
-            '''
-        }
-    }
-
-    stage('Terraform init') {
-        steps {
-            sh 'terrform init'
-        }
-    }
-
-    stage('Terraform plan') {
-        steps {
-            sh 'terrform plan -out=tfplan'
-        }
-    }
-
-    stage('Terraform Apply') {
-        steps {
-            sh 'terrform apply -auto-arppove tfplan'
-        }
-    }
-    }
-
 post {
-    always {
-        sh 'terraform state list'
+        success {
+            // Clean up, e.g., destroy resources (optional)
+            sh 'terraform destroy -auto-approve'
+        }
     }
-    success{
-        echo 'Terraform applied successfully'
-    }
-    failure {
-        echo 'Terraform deplyment failed'
-    }
-}
 }
